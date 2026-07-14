@@ -8,7 +8,11 @@ from pydantic import BaseModel, ConfigDict
 from typing import Optional, List
 
 # Data storage directory setup
-DATA_DIR = Path(__file__).parent.parent.parent.parent / "data_storage"
+_data_dir_env = os.getenv("AUTOSOCIETY_DATA_DIR")
+if _data_dir_env:
+    DATA_DIR = Path(_data_dir_env)
+else:
+    DATA_DIR = Path(__file__).parent.parent.parent.parent / "data_storage"
 DATA_DIR.mkdir(exist_ok=True)
 DB_PATH = DATA_DIR / "autosociety.db"
 DATABASE_URL = f"sqlite:///{DB_PATH}"

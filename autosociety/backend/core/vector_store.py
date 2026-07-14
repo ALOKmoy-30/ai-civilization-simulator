@@ -1,9 +1,14 @@
+import os
 from pathlib import Path
 import chromadb
 from typing import List, Dict, Optional
 
 # Data storage directory setup
-DATA_DIR = Path(__file__).parent.parent.parent.parent / "data_storage"
+_data_dir_env = os.getenv("AUTOSOCIETY_DATA_DIR")
+if _data_dir_env:
+    DATA_DIR = Path(_data_dir_env)
+else:
+    DATA_DIR = Path(__file__).parent.parent.parent.parent / "data_storage"
 DATA_DIR.mkdir(exist_ok=True)
 CHROMA_DIR = DATA_DIR / "chroma_db"
 CHROMA_DIR.mkdir(exist_ok=True)

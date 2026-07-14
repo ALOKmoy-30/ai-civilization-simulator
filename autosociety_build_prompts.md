@@ -178,6 +178,7 @@ Report back the exact commands you ran and their output before moving to the nex
 ## Phase 5: Streamlit Dashboard (UI & Polling)
 
 ```
+
 ROLE: You are continuing work on "AutoSociety." Phases 1-4 (data layer, agents, world rules, FastAPI backend) are complete, tested, and the server can be started with `uvicorn backend.main:app`. You are now working ONLY on Phase 5 of 5: the Streamlit Dashboard.
 
 SYSTEM CONTEXT:
