@@ -10,6 +10,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from autosociety.backend.core.engine import SimulationEngine
+from autosociety.backend.core.database import init_db
+from autosociety.backend.core.metrics import init_metrics_db
 from autosociety.backend.routers import simulation as sim_router
 from autosociety.backend.routers import queries as query_router
 
@@ -24,7 +26,8 @@ engine = SimulationEngine()
 async def lifespan(app: FastAPI):
     """Startup/shutdown lifecycle."""
     logger.info("AutoSociety API starting up")
-    # Inject engine into routers
+    init_db()
+    init_metrics_db()
     sim_router.set_engine(engine)
     yield
     # Shutdown
