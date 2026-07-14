@@ -1,0 +1,66 @@
+"""
+FastAPI application for AutoSociety.
+Wires the engine, simulation control, and query routers together.
+"""
+
+import logging
+from contextlib import asynccontextmanager
+
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+from autosociety.backend.core.engine import SimulationEngine
+from autosociety.backend.routers import simulation as sim_router
+from autosociety.backend.routers import queries as query_router
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# Singleton engine
+engine = SimulationEngine()
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Startup/shutdown lifecycle."""
+    logger.info("AutoSociety API starting up")
+    # Inject engine into routers
+    sim_router.set_engine(engine)
+    yield
+    # Shutdown
+    if engine.is_running:
+        engine.stop()
+        logger.info("AutoSociety API shut down")
+
+
+app = FastAPI(
+    title="AutoSociety",
+    description="Multi-agent society simulator API",
+    version="0.4.0",
+    lifespan=lifespan,
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+app.include_router(sim_router.router)
+app.include_router(query_router.router)
+
+
+@app.get("/")
+async def root():
+    return {
+        "app": "AutoSociety",
+        "version": "0.4.0",
+        "docs": "/docs",
+    }
+
+
+@app.get("/health")
+async def health():
+    return {"status": "ok", "engine_running": engine.is_running}

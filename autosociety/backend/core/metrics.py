@@ -5,6 +5,7 @@ Writes one snapshot per tick; never overwrites prior history.
 
 import csv
 import io
+import os
 from datetime import datetime
 from typing import List, Dict, Any, Optional
 from pathlib import Path
