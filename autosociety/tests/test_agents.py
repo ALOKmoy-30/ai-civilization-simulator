@@ -11,7 +11,7 @@ from crewai import LLM
 from autosociety.backend.core.database import (
     init_db, get_session, create_citizen, CitizenCreate,
     get_citizen, get_or_create_world_state,
-    DB_PATH, engine,
+    engine, Base,
 )
 from autosociety.agents.tools.rag_search import create_rag_tool
 from autosociety.agents.crews.citizen import build_citizen_agent, run_citizen_decision
@@ -36,23 +36,13 @@ def dummy_kickoff(text: str):
 
 @pytest.fixture(scope="function")
 def db():
-    """Fresh DB per test."""
-    if DB_PATH.exists():
-        try:
-            engine.dispose()
-            DB_PATH.unlink()
-        except PermissionError:
-            pass
+    """Fresh DB per test. Uses drop/create to avoid Windows file locking."""
     init_db()
     session = get_session()
     yield session
     session.close()
-    engine.dispose()
-    if DB_PATH.exists():
-        try:
-            DB_PATH.unlink()
-        except PermissionError:
-            pass
+    Base.metadata.drop_all(bind=engine)
+    Base.metadata.create_all(bind=engine)
 
 
 @pytest.fixture(scope="function")

@@ -25,27 +25,21 @@ from autosociety.backend.core.database import (
     create_business,
     BusinessCreate,
     create_event,
-    DATABASE_URL,
-    DB_PATH,
     engine,
+    Base,
 )
 
 
 @pytest.fixture(scope="function")
 def db_session():
-    """Create a fresh database for each test."""
-    # Remove test DB if it exists
-    if DB_PATH.exists():
-        DB_PATH.unlink()
-
+    """Create a fresh database for each test. Uses drop/create to avoid Windows file locking."""
     init_db()
     session = get_session()
     yield session
-    # Cleanup after test
     session.close()
-    engine.dispose()  # Close all connections
-    if DB_PATH.exists():
-        DB_PATH.unlink()
+    # Drop tables instead of deleting the file (avoids Windows file-lock issues)
+    Base.metadata.drop_all(bind=engine)
+    Base.metadata.create_all(bind=engine)
 
 
 def test_create_citizen(db_session):
