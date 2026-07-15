@@ -267,7 +267,7 @@ class SimulationEngine:
                     w_delta = effects_info.get("wealth_delta", 0)
                     create_event(s,
                         description=(
-                            f"{citizen_name}: {action_preview} "
+                            f"[Citizen #{cid} | {citizen_name}] {action_preview} "
                             f"[Effects: Happiness {h_delta:+,}, Wealth ${w_delta:+,}]"
                         ),
                         event_type="citizen_action", severity=1,
@@ -288,7 +288,7 @@ class SimulationEngine:
                     s = get_session()
                     create_event(s,
                         description=(
-                            f"[Tick {self._tick}] Citizen {cid} LLM timed out "
+                            f"[Citizen #{cid}] LLM timed out "
                             f"after {elapsed:.0f}s. Skipping decision this tick."
                         ),
                         event_type="agent_timeout", severity=2,
@@ -319,8 +319,7 @@ class SimulationEngine:
                     s = get_session()
                     create_event(s,
                         description=(
-                            f"[Tick {self._tick}] Citizen {cid} was unable to "
-                            f"make a decision today. "
+                            f"[Citizen #{cid}] Unable to make a decision today. "
                             f"(Error: {err_type}: {e})"
                         ),
                         event_type="agent_failure", severity=2,
