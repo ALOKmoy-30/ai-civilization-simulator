@@ -123,10 +123,16 @@ class SimulationEngine:
 
     async def _run_loop(self):
         """Main simulation loop. Runs until stopped."""
-        init_db()
-        init_metrics_db()
+        # Yield immediately so the HTTP response for /start is sent before we
+        # do any blocking setup work.
+        await asyncio.sleep(0)
 
-        self._scheduler = ActionScheduler(self._get_population())
+        # Run sync DB init in a thread so the event loop stays responsive
+        await asyncio.to_thread(init_db)
+        await asyncio.to_thread(init_metrics_db)
+
+        population = await asyncio.to_thread(self._get_population)
+        self._scheduler = ActionScheduler(population)
 
         while self._running:
             if self._paused:
@@ -148,17 +154,14 @@ class SimulationEngine:
         except Exception:
             return 0
 
-    async def _advance_tick(self):
-        """Execute one tick's worth of world updates."""
-        self._tick += 1
-        reasoning_set = self._scheduler.tick()
-
+    def _sync_advance_tick(self):
+        """Synchronous DB work for one tick. Called via asyncio.to_thread."""
         session = get_session()
         citizens = list_citizens(session)
-        session.close()
 
         if not citizens:
-            return
+            session.close()
+            return None
 
         total_gdp = 0.0
         crime_events = 0
@@ -168,26 +171,19 @@ class SimulationEngine:
             result = apply_disaster(disaster_type)
             logger.info("Tick %d: %s", self._tick, result["description"])
 
-        # Lightweight deterministic updates for ALL citizens
+        # Lightweight deterministic updates for ALL citizens — single session
         for citizen in citizens:
             wage = calculate_wage(citizen.job, 50.0)
             tax = calculate_tax(wage)
             wealth_tax = calculate_wealth_tax(citizen.wealth)
             net_income = wage - tax - wealth_tax
 
-            s = get_session()
-            update_citizen(s, citizen.id, {
+            update_citizen(session, citizen.id, {
                 "wealth": round(max(0, citizen.wealth + net_income), 2),
             })
-            s.close()
             total_gdp += wage
 
-        # Full reasoning for selected citizens (offloaded to thread pool)
-        if reasoning_set:
-            await self._run_reasoning_batch(reasoning_set)
-
-        # Update world state
-        session = get_session()
+        # Update world state in the same session
         world = get_or_create_world_state(session)
         update_world_state(session, {
             "simulation_day": world.simulation_day + 1,
@@ -195,17 +191,37 @@ class SimulationEngine:
         })
         session.close()
 
-        self._last_gdp = total_gdp
-        self._last_crime_rate = crime_events / max(1, len(citizens))
+        return {
+            "total_gdp": total_gdp,
+            "crime_rate": crime_events / max(1, len(citizens)),
+        }
+
+    async def _advance_tick(self):
+        """Execute one tick's worth of world updates."""
+        self._tick += 1
+        reasoning_set = self._scheduler.tick() if self._scheduler else set()
+
+        # Run all sync DB work in a thread
+        result = await asyncio.to_thread(self._sync_advance_tick)
+
+        if result is None:
+            return
+
+        self._last_gdp = result["total_gdp"]
+        self._last_crime_rate = result["crime_rate"]
         self._last_active_businesses = 0
 
         record_snapshot(
             tick=self._tick,
-            gdp=total_gdp,
+            gdp=self._last_gdp,
             crime_rate=self._last_crime_rate,
             tax_revenue=0,
             active_businesses=0,
         )
+
+        # Full reasoning for selected citizens (offloaded to thread pool)
+        if reasoning_set:
+            await self._run_reasoning_batch(reasoning_set)
 
     async def _run_reasoning_batch(self, citizen_ids):
         """Run CrewAI reasoning for selected citizens in thread pool."""

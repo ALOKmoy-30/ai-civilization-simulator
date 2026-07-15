@@ -1,5 +1,4 @@
-"""Simulation control endpoints."""
-
+import asyncio
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
@@ -51,7 +50,8 @@ def get_engine() -> SimulationEngine:
 async def get_world_state():
     """Return current simulation world state."""
     eng = get_engine()
-    state = eng.get_state()
+    # Run the sync DB work in a thread so it doesn't block the event loop
+    state = await asyncio.to_thread(eng.get_state)
     return WorldStateResponse(**state)
 
 
