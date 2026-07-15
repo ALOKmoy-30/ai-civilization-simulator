@@ -18,6 +18,10 @@ Displays society-wide averages, GDP trends, and Gini coefficient over time, help
 Every month, the Finance, Police, Education, and Health Ministers analyze the state of the society and propose bills. The Policy Coordinator resolves contradictions, and the Governor issues final approvals.
 ![Government Panel](docs/screenshots/government.png)
 
+### 📜 Enacted Policies
+The Government Crew proposes and enacts policies each simulation month. Policies affect macro‑economic variables such as tax rates, public spending, and education funding. The **Enacted Policies** table in the UI shows a chronological list of all passed bills, their descriptions, and their impact on key metrics.
+![Enacted Policies](docs/screenshots/government_policies.png)
+
 ### 👥 4. Citizen Registry & Agent Memory
 Explore the status of all 30 citizens. View their jobs, financial standing, happiness levels, and recent decisions.
 ![Citizens](docs/screenshots/citizens.png)
