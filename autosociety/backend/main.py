@@ -12,7 +12,43 @@ import litellm
 litellm.num_retries = 5
 
 import logging
+import os
+import sys
+import httpx
 from contextlib import asynccontextmanager
+
+# On Windows, asyncio ProactorEventLoop raises noisy ConnectionResetError [WinError 10054]
+# inside _ProactorBasePipeTransport._call_connection_lost() when clients close sockets abruptly.
+# We patch _call_connection_lost to safely catch OSError during shutdown/close.
+if sys.platform == "win32":
+    import asyncio.proactor_events as _pe
+    import socket as _socket
+
+    def _safe_call_connection_lost(self, exc):
+        if self._called_connection_lost:
+            return
+        try:
+            self._protocol.connection_lost(exc)
+        finally:
+            if hasattr(self, "_sock") and self._sock is not None:
+                try:
+                    if hasattr(self._sock, "shutdown") and self._sock.fileno() != -1:
+                        self._sock.shutdown(_socket.SHUT_RDWR)
+                except OSError:
+                    pass
+                finally:
+                    try:
+                        self._sock.close()
+                    except OSError:
+                        pass
+                    self._sock = None
+            server = self._server
+            if server is not None:
+                server._detach(self)
+                self._server = None
+            self._called_connection_lost = True
+
+    _pe._ProactorBasePipeTransport._call_connection_lost = _safe_call_connection_lost
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -30,12 +66,37 @@ logger = logging.getLogger(__name__)
 engine = SimulationEngine()
 
 
+async def _check_ollama():
+    """Verify Ollama is reachable at startup. Logs a warning if not."""
+    base_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+    try:
+        async with httpx.AsyncClient(timeout=5) as client:
+            r = await client.get(f"{base_url}/api/tags")
+            r.raise_for_status()
+            data = r.json()
+            model = os.getenv("OLLAMA_MODEL", "qwen2.5-coder:3b")
+            models = [m["name"] for m in data.get("models", [])]
+            if model in models or any(model in m for m in models):
+                logger.info("Ollama OK — %s available", model)
+            else:
+                logger.warning(
+                    "Ollama running but model '%s' not found. "
+                    "Run: ollama pull %s", model, model
+                )
+    except Exception as e:
+        logger.warning(
+            "Ollama not reachable at %s (%s). "
+            "Start it with: ollama serve", base_url, e
+        )
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup/shutdown lifecycle."""
     logger.info("AutoSociety API starting up")
     init_db()
     init_metrics_db()
+    await _check_ollama()
     sim_router.set_engine(engine)
     yield
     # Shutdown

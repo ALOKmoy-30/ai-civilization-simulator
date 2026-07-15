@@ -20,7 +20,7 @@ from autosociety.backend.core.database import (
     Base as DBBase,
     engine as db_engine,
 )
-from autosociety.backend.core.metrics import MetricsBase, metrics_engine
+from autosociety.backend.core.metrics import MetricsBase, metrics_engine, init_metrics_db
 
 fake = Faker()
 
@@ -37,11 +37,17 @@ JOBS = [
 
 def seed_citizens(num_citizens: int = 30):
     """Generate and insert dummy citizens into the database."""
-    print(f"Resetting database (dropping all tables)...")
-    DBBase.metadata.drop_all(bind=db_engine)
-    MetricsBase.metadata.drop_all(bind=metrics_engine)
-    print(f"Creating fresh tables...")
-    init_db()
+    if "--append" in sys.argv:
+        print(f"Appending {num_citizens} citizens without dropping existing tables...")
+        init_db()
+        init_metrics_db()
+    else:
+        print(f"Resetting database (dropping all tables)...")
+        DBBase.metadata.drop_all(bind=db_engine)
+        MetricsBase.metadata.drop_all(bind=metrics_engine)
+        print(f"Creating fresh tables...")
+        init_db()
+        init_metrics_db()
 
     session = get_session()
 

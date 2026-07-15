@@ -1,34 +1,17 @@
 """Government Panel — policies, budget, decisions."""
 
 import streamlit as st
-import requests
 import pandas as pd
 
-API_BASE = "http://localhost:8243"
+from autosociety.frontend.components import check_backend_or_retry, api_get
 
 st.set_page_config(page_title="Government — AutoSociety", page_icon="🏛️", layout="wide")
 st.title("🏛️ Government Panel")
 
-
-def api_get(path: str):
-    try:
-        r = requests.get(f"{API_BASE}{path}", timeout=3)
-        r.raise_for_status()
-        return r.json()
-    except requests.RequestException:
-        return None
-
-
-health = api_get("/health")
-if health is None:
-    st.error("🚫 Backend not reachable. Start the API server first.")
+if not check_backend_or_retry():
     st.stop()
 
-
-# ── Current World State ────────────────────────────────────────────
-
 state = api_get("/simulation/state")
-
 if state:
     st.subheader("🌍 World Overview")
     c1, c2, c3, c4 = st.columns(4)
@@ -36,37 +19,23 @@ if state:
     c2.metric("Economic Health", f'{state.get("economic_health", 0):.1f}')
     c3.metric("Avg Happiness", f'{state.get("avg_happiness", 0):.1f}')
     c4.metric("Day", state.get("tick", 0))
-else:
-    st.warning("World state not available")
-
-
-# ── Policies ────────────────────────────────────────────────────────
 
 st.subheader("📜 Enacted Policies")
 policies = api_get("/queries/policies")
-
 if policies:
     df = pd.DataFrame(policies)
     if not df.empty:
         cols = ["id", "name", "description", "is_active", "created_at"]
         display_cols = [c for c in cols if c in df.columns]
-        st.dataframe(
-            df[display_cols].sort_values("id", ascending=False),
-            use_container_width=True,
-            hide_index=True,
-        )
+        st.dataframe(df[display_cols].sort_values("id", ascending=False), width="stretch", hide_index=True)
         st.caption(f"Total policies: {len(policies)}")
     else:
         st.info("No policies enacted yet.")
 else:
-    st.info("No policies found. The Government crew will create policies during simulation.")
-
-
-# ── Recent Events ──────────────────────────────────────────────────
+    st.info("No policies found.")
 
 st.subheader("📰 Recent Events")
 events = api_get("/queries/events")
-
 if events:
     for e in events[:10]:
         with st.container(border=True):
@@ -74,9 +43,6 @@ if events:
             st.caption(e.get("description", ""))
 else:
     st.info("No events recorded yet.")
-
-
-# ── Reports ─────────────────────────────────────────────────────────
 
 st.subheader("📋 Society Report")
 report = api_get("/queries/reports")

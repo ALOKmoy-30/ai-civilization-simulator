@@ -59,6 +59,7 @@ def record_snapshot(tick: int, gdp: float, crime_rate: float,
     """
     Record a single tick's snapshot. Appends a row — never modifies history.
     """
+    init_metrics_db()
     session = get_session()
     citizens = list_citizens(session)
     world = get_or_create_world_state(session)
@@ -98,6 +99,7 @@ def record_snapshot(tick: int, gdp: float, crime_rate: float,
 
 def get_all_snapshots() -> List[TickSnapshot]:
     """Return all recorded snapshots in tick order."""
+    init_metrics_db()
     m_session = MetricsSession()
     snapshots = m_session.query(TickSnapshot).order_by(TickSnapshot.tick).all()
     m_session.close()

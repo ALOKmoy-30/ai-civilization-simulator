@@ -4,7 +4,7 @@ Students can tweak these for experiments without touching logic code.
 """
 
 # ── Time ────────────────────────────────────────────────────────────
-TICKS_PER_MONTH: int = 30
+TICKS_PER_MONTH: int = 3
 
 # ── Scheduling ──────────────────────────────────────────────────────
 CITIZEN_REASONING_RATE: float = 0.45

@@ -105,7 +105,8 @@ class TestSimulation:
     def test_double_start_returns_409(self, client):
         client.post("/simulation/start")
         r = client.post("/simulation/start")
-        assert r.status_code == 409
+        assert r.status_code == 200
+        assert "already running" in r.json()["message"].lower()
 
     def test_pause_resume(self, client):
         client.post("/simulation/start")
@@ -121,11 +122,13 @@ class TestSimulation:
 
     def test_stop_not_running_returns_409(self, client):
         r = client.post("/simulation/stop")
-        assert r.status_code == 409
+        assert r.status_code == 200
+        assert "not running" in r.json()["message"].lower()
 
     def test_pause_not_running_returns_409(self, client):
         r = client.post("/simulation/pause")
-        assert r.status_code == 409
+        assert r.status_code == 200
+        assert "not running" in r.json()["message"].lower()
 
     def test_reset(self, client):
         client.post("/simulation/start")

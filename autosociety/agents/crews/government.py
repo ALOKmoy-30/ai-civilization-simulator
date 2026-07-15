@@ -1,36 +1,13 @@
 import os
 from typing import Any, Dict
 
-from crewai import Agent, Task, Crew, Process, LLM
+from crewai import Agent, Task, Crew, Process
 
 from autosociety.backend.core.database import (
     get_session, get_or_create_world_state, update_world_state,
     create_policy, PolicyCreate,
 )
-
-
-def _build_llm(temperature: float = 0.4):
-    """Build a CrewAI LLM, routing through 9Router proxy if GEMINI_API_BASE is set."""
-    api_key = os.getenv("GEMINI_API_KEY")
-    if not api_key:
-        raise ValueError("GEMINI_API_KEY env var not set")
-    api_base = os.getenv("GEMINI_API_BASE")  # e.g. http://localhost:20128/v1
-
-    if api_base:
-        # Route through 9Router OpenAI-compatible proxy via LiteLLM
-        return LLM(
-            model="openai/gemini-2.0-flash",
-            api_key=api_key,
-            base_url=api_base,
-            temperature=temperature,
-        )
-    else:
-        # Direct Gemini access (no proxy)
-        return LLM(
-            model="gemini/gemini-2.0-flash",
-            api_key=api_key,
-            temperature=temperature,
-        )
+from autosociety.agents.llm_config import get_llm
 
 
 MINISTER_ROLES = {
@@ -65,7 +42,7 @@ class GovernmentCrew:
     """Assembles the Government ministers and runs policy decisions."""
 
     def __init__(self):
-        self.llm = _build_llm()
+        self.llm = get_llm(temperature=0.4)
         self.ministers: Dict[str, Agent] = {}
         self._build_ministers()
 
@@ -115,7 +92,6 @@ class GovernmentCrew:
 
     def decide_policy(self, situation: str) -> Dict[str, Any]:
         """Run a full government policy cycle and return a structured decision."""
-        # Load current world state
         session = get_session()
         world = get_or_create_world_state(session)
         session.close()
@@ -130,7 +106,6 @@ class GovernmentCrew:
 
         tasks = []
 
-        # Phase 1: each minister proposes
         for key, agent in self.ministers.items():
             tasks.append(Task(
                 description=(
@@ -145,7 +120,6 @@ class GovernmentCrew:
                 agent=agent,
             ))
 
-        # Phase 2: Policy Coordinator synthesizes
         coordinator = self._build_policy_coordinator()
         tasks.append(Task(
             description=(
@@ -161,7 +135,6 @@ class GovernmentCrew:
             agent=coordinator,
         ))
 
-        # Phase 3: Governor final decision
         governor = self._build_decision_aggregator()
         tasks.append(Task(
             description=(
@@ -191,16 +164,13 @@ class GovernmentCrew:
         result = crew.kickoff()
         decision_text = str(result)
 
-        # Parse structured output and persist
         policy_name = _extract_field(decision_text, "POLICY NAME", "Unnamed Policy")
         description = _extract_field(decision_text, "DESCRIPTION", decision_text[:200])
         effects_raw = _extract_field(decision_text, "EFFECTS", "")
         decision_status = _extract_field(decision_text, "DECISION", "approved")
 
-        # Parse numeric effects
         effects = _parse_effects(effects_raw)
 
-        # Update world state
         session = get_session()
         world = get_or_create_world_state(session)
         new_happiness = max(0, min(100, world.avg_happiness + effects.get("avg_happiness", 0)))
@@ -214,7 +184,6 @@ class GovernmentCrew:
             "simulation_day": world.simulation_day + 1,
         })
 
-        # Persist as a Policy record
         policy = create_policy(session, PolicyCreate(
             name=policy_name,
             description=description,
@@ -233,7 +202,6 @@ class GovernmentCrew:
 
 
 def _extract_field(text: str, field: str, default: str = "") -> str:
-    """Extract a labeled field from structured output."""
     import re
     pattern = rf"{re.escape(field)}:\s*(.+?)(?:\n|$)"
     match = re.search(pattern, text, re.IGNORECASE)
@@ -241,7 +209,6 @@ def _extract_field(text: str, field: str, default: str = "") -> str:
 
 
 def _parse_effects(raw: str) -> Dict[str, int]:
-    """Parse 'economic_health=X, avg_happiness=Y, ...' into a dict."""
     import re
     effects = {}
     for match in re.finditer(r"(\w+)\s*=\s*([+-]?\d+)", raw):

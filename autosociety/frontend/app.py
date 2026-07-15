@@ -8,29 +8,18 @@ from typing import Optional, Dict, Any
 from autosociety.frontend.components.charts import (
     time_series_line, multi_line, gauge_chart,
 )
+from autosociety.frontend.components import check_backend_or_retry, api_get, API_BASE
 
 # ── Config ─────────────────────────────────────────────────────────
 
-API_BASE = "http://localhost:8243"
-POLL_INTERVAL = 2.5  # seconds between automatic refreshes
+POLL_INTERVAL = 2.5
 
 st.set_page_config(page_title="AutoSociety", page_icon="🏛️", layout="wide")
 
 
-# ── API helpers ─────────────────────────────────────────────────────
+# ── POST helper ─────────────────────────────────────────────────────
 
-def api_get(path: str) -> Optional[Dict]:
-    """Safe GET request. Returns None on failure."""
-    try:
-        r = requests.get(f"{API_BASE}{path}", timeout=3)
-        r.raise_for_status()
-        return r.json()
-    except requests.RequestException:
-        return None
-
-
-def api_post(path: str) -> Optional[Dict]:
-    """Safe POST request."""
+def api_post(path: str):
     try:
         r = requests.post(f"{API_BASE}{path}", timeout=3)
         r.raise_for_status()
@@ -64,11 +53,8 @@ def poll():
 
 st.title("🏛️ AutoSociety — Multi-Agent Simulator")
 
-# Check backend connectivity
-health = api_get("/health")
-if health is None:
-    st.error("🚫 Backend not reachable. Start the API server first:\n\n"
-             "```\nuvicorn autosociety.backend.main:app --host 0.0.0.0 --port 8243\n```")
+# Check backend connectivity (with retry button)
+if not check_backend_or_retry():
     st.stop()
 
 
@@ -78,7 +64,7 @@ st.subheader("🎮 Simulation Controls")
 cols = st.columns(5)
 
 with cols[0]:
-    if st.button("▶️ Start", use_container_width=True):
+    if st.button("▶️ Start", width="stretch"):
         result = api_post("/simulation/start")
         if result:
             st.success(result.get("message", "Started"))
@@ -86,25 +72,25 @@ with cols[0]:
             st.error("Failed to start")
 
 with cols[1]:
-    if st.button("⏸️ Pause", use_container_width=True):
+    if st.button("⏸️ Pause", width="stretch"):
         result = api_post("/simulation/pause")
         if result:
             st.success(result.get("message", "Paused"))
 
 with cols[2]:
-    if st.button("▶️ Resume", use_container_width=True):
+    if st.button("▶️ Resume", width="stretch"):
         result = api_post("/simulation/resume")
         if result:
             st.success(result.get("message", "Resumed"))
 
 with cols[3]:
-    if st.button("⏹️ Stop", use_container_width=True):
+    if st.button("⏹️ Stop", width="stretch"):
         result = api_post("/simulation/stop")
         if result:
             st.success(result.get("message", "Stopped"))
 
 with cols[4]:
-    if st.button("🔄 Reset", use_container_width=True):
+    if st.button("🔄 Reset", width="stretch"):
         result = api_post("/simulation/reset")
         if result:
             st.success(result.get("message", "Reset"))
@@ -160,21 +146,21 @@ if analytics:
     with tab1:
         gdp_fig = time_series_line(analytics, "tick", "gdp",
                                     "GDP Over Time", color="#1f77b4")
-        st.plotly_chart(gdp_fig, use_container_width=True)
+        st.plotly_chart(gdp_fig, width="stretch")
 
         wealth_fig = time_series_line(analytics, "tick", "avg_wealth",
                                        "Average Wealth Over Time", color="#ff7f0e")
-        st.plotly_chart(wealth_fig, use_container_width=True)
+        st.plotly_chart(wealth_fig, width="stretch")
 
     with tab2:
         multi = multi_line(analytics, "tick",
                            ["avg_happiness", "political_stability", "economic_health"],
                            "Society Indicators")
-        st.plotly_chart(multi, use_container_width=True)
+        st.plotly_chart(multi, width="stretch")
 
         crime_fig = time_series_line(analytics, "tick", "crime_rate",
                                       "Crime Rate Over Time", color="#d62728")
-        st.plotly_chart(crime_fig, use_container_width=True)
+        st.plotly_chart(crime_fig, width="stretch")
 
     st.caption("Data refreshes every ~2.5 seconds while simulation is running.")
 else:

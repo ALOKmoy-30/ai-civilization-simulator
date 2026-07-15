@@ -22,7 +22,7 @@ from autosociety.agents.crews.government import GovernmentCrew
 
 def mock_llm():
     """Return a CrewAI LLM with a fake provider so no real API call is made."""
-    return LLM(model="gemini/gemini-2.0-flash", api_key="mock-key")
+    return LLM(model="ollama/qwen2.5-coder:3b")
 
 
 def dummy_kickoff(text: str):
@@ -80,7 +80,7 @@ class TestRagTool:
 class TestBuildCitizenAgent:
     def test_agent_created(self, sample_citizen):
         """Agent factory produces a correctly configured agent."""
-        with patch("autosociety.agents.crews.citizen._build_llm") as mock_build:
+        with patch("autosociety.agents.llm_config.get_llm") as mock_build:
             mock_build.return_value = mock_llm()
             agent = build_citizen_agent(sample_citizen)
 
@@ -93,13 +93,13 @@ class TestBuildCitizenAgent:
     def test_agent_invalid_id(self, db):
         """Non-existent citizen raises ValueError."""
         db.close()
-        with patch("autosociety.agents.crews.citizen._build_llm"):
+        with patch("autosociety.agents.llm_config.get_llm"):
             with pytest.raises(ValueError, match="not found"):
                 build_citizen_agent(99999)
 
     def test_run_decision_writeback(self, sample_citizen):
         """Decision cycle writes effects back to citizen in DB."""
-        with patch("autosociety.agents.crews.citizen._build_llm") as mock_build:
+        with patch("autosociety.agents.llm_config.get_llm") as mock_build:
             mock_build.return_value = mock_llm()
             with patch("autosociety.agents.crews.citizen.Crew.kickoff") as mock_kickoff:
                 mock_kickoff.return_value = dummy_kickoff(
@@ -124,7 +124,7 @@ class TestBuildCitizenAgent:
 class TestGovernmentCrew:
     def test_crew_ministers_created(self):
         """GovernmentCrew creates all four ministers."""
-        with patch("autosociety.agents.crews.government._build_llm") as mock_build:
+        with patch("autosociety.agents.llm_config.get_llm") as mock_build:
             mock_build.return_value = mock_llm()
             crew = GovernmentCrew()
 
@@ -139,7 +139,7 @@ class TestGovernmentCrew:
         get_or_create_world_state(db)
         db.close()
 
-        with patch("autosociety.agents.crews.government._build_llm") as mock_build:
+        with patch("autosociety.agents.llm_config.get_llm") as mock_build:
             mock_build.return_value = mock_llm()
             with patch("autosociety.agents.crews.government.Crew.kickoff") as mock_kickoff:
                 mock_kickoff.return_value = dummy_kickoff(
@@ -162,7 +162,7 @@ class TestGovernmentCrew:
         get_or_create_world_state(db)
         db.close()
 
-        with patch("autosociety.agents.crews.government._build_llm") as mock_build:
+        with patch("autosociety.agents.llm_config.get_llm") as mock_build:
             mock_build.return_value = mock_llm()
             with patch("autosociety.agents.crews.government.Crew.kickoff") as mock_kickoff:
                 mock_kickoff.return_value = dummy_kickoff(

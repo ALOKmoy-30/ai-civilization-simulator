@@ -16,7 +16,45 @@ import os
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).parent.parent
-PYTHON = sys.executable
+
+# Prefer the venv Python if running from outside the venv
+_venv_python = PROJECT_ROOT / "venv" / "Scripts" / "python.exe"
+if _venv_python.exists() and "venv" not in sys.executable:
+    PYTHON = str(_venv_python)
+else:
+    PYTHON = sys.executable
+
+# On Windows, asyncio ProactorEventLoop raises noisy ConnectionResetError [WinError 10054]
+# inside _ProactorBasePipeTransport._call_connection_lost() when clients close sockets abruptly.
+if sys.platform == "win32":
+    import asyncio.proactor_events as _pe
+    import socket as _socket
+
+    def _safe_call_connection_lost(self, exc):
+        if self._called_connection_lost:
+            return
+        try:
+            self._protocol.connection_lost(exc)
+        finally:
+            if hasattr(self, "_sock") and self._sock is not None:
+                try:
+                    if hasattr(self._sock, "shutdown") and self._sock.fileno() != -1:
+                        self._sock.shutdown(_socket.SHUT_RDWR)
+                except OSError:
+                    pass
+                finally:
+                    try:
+                        self._sock.close()
+                    except OSError:
+                        pass
+                    self._sock = None
+            server = self._server
+            if server is not None:
+                server._detach(self)
+                self._server = None
+            self._called_connection_lost = True
+
+    _pe._ProactorBasePipeTransport._call_connection_lost = _safe_call_connection_lost
 
 BACKEND_PORT = 8243
 

@@ -1,35 +1,10 @@
-import os
 from typing import Optional
 
 from crewai import Agent, Task, Crew, Process
-from crewai import LLM
 
 from autosociety.backend.core.database import get_session, get_citizen, update_citizen, Citizen
 from autosociety.agents.tools.rag_search import create_rag_tool
-
-
-def _build_llm(temperature: float = 0.7):
-    """Build a CrewAI LLM, routing through 9Router proxy if GEMINI_API_BASE is set."""
-    api_key = os.getenv("GEMINI_API_KEY")
-    if not api_key:
-        raise ValueError("GEMINI_API_KEY env var not set")
-    api_base = os.getenv("GEMINI_API_BASE")  # e.g. http://localhost:20128/v1
-
-    if api_base:
-        # Route through 9Router OpenAI-compatible proxy via LiteLLM
-        return LLM(
-            model="openai/gemini-2.0-flash",
-            api_key=api_key,
-            base_url=api_base,
-            temperature=temperature,
-        )
-    else:
-        # Direct Gemini access (no proxy)
-        return LLM(
-            model="gemini/gemini-2.0-flash",
-            api_key=api_key,
-            temperature=temperature,
-        )
+from autosociety.agents.llm_config import get_llm
 
 
 def build_citizen_agent(citizen_id: int) -> Agent:
@@ -63,7 +38,7 @@ def build_citizen_agent(citizen_id: int) -> Agent:
         ),
         verbose=False,
         allow_delegation=False,
-        llm=_build_llm(),
+        llm=get_llm(),
         tools=[create_rag_tool(citizen_id)],
     )
 
@@ -104,7 +79,6 @@ def run_citizen_decision(citizen_id: int, situation: str) -> dict:
     result = crew.kickoff()
     decision_text = str(result)
 
-    # Persist decision effects on the citizen
     happiness_delta = _extract_delta(decision_text, "happiness", default=-2)
     wealth_delta = _extract_delta(decision_text, "wealth", default=-5)
 

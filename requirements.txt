@@ -6,11 +6,9 @@ faker>=21.0.0
 pytest>=7.4.3
 crewai>=0.28.0
 litellm
-
-langchain>=0.1.0
-langchain-google-genai>=0.0.6
 fastapi>=0.109.0
 uvicorn[standard]>=0.27.0
 streamlit>=1.28.0
 plotly>=5.18.0
 requests>=2.31.0
+httpx>=0.27.0
