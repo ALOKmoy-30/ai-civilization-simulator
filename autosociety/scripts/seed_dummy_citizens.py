@@ -4,6 +4,8 @@ Run with: python -m autosociety.scripts.seed_dummy_citizens
 """
 
 import sys
+import shutil
+from datetime import datetime
 from pathlib import Path
 
 # Add project root to path
@@ -19,8 +21,20 @@ from autosociety.backend.core.database import (
     count_citizens,
     Base as DBBase,
     engine as db_engine,
+    DB_PATH,
 )
-from autosociety.backend.core.metrics import MetricsBase, metrics_engine, init_metrics_db
+from autosociety.backend.core.metrics import (
+    MetricsBase, metrics_engine, init_metrics_db, METRICS_DB_PATH,
+)
+
+
+def _backup(path: Path):
+    """Copy a SQLite file to a timestamped .bak before a destructive reset."""
+    if path.exists() and path.stat().st_size > 0:
+        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+        backup = path.with_name(f"{path.stem}_{ts}.bak")
+        shutil.copy2(path, backup)
+        print(f"  Backed up → {backup.name}")
 
 fake = Faker()
 
@@ -42,6 +56,9 @@ def seed_citizens(num_citizens: int = 30):
         init_db()
         init_metrics_db()
     else:
+        print("Creating safety backups before reset...")
+        _backup(DB_PATH)
+        _backup(METRICS_DB_PATH)
         print(f"Resetting database (dropping all tables)...")
         DBBase.metadata.drop_all(bind=db_engine)
         MetricsBase.metadata.drop_all(bind=metrics_engine)

@@ -36,13 +36,10 @@ def dummy_kickoff(text: str):
 
 @pytest.fixture(scope="function")
 def db():
-    """Fresh DB per test. Uses drop/create to avoid Windows file locking."""
-    init_db()
+    """Fresh DB session per test. Table setup/teardown handled by conftest.py."""
     session = get_session()
     yield session
     session.close()
-    Base.metadata.drop_all(bind=engine)
-    Base.metadata.create_all(bind=engine)
 
 
 @pytest.fixture(scope="function")

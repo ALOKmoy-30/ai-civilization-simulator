@@ -20,7 +20,12 @@ from autosociety.backend.core.database import get_or_create_world_state
 
 # ── Metrics SQLite Table (separate from main DB to enable easy CSV export) ──
 
-METRICS_DB_PATH = DATA_DIR / "metrics.db"
+# Tests get their own isolated metrics DB, never the live one.
+_is_testing = bool(os.getenv("PYTEST_CURRENT_TEST") or os.getenv("TESTING"))
+if _is_testing:
+    METRICS_DB_PATH = DATA_DIR / "test_metrics.db"
+else:
+    METRICS_DB_PATH = DATA_DIR / "metrics.db"
 METRICS_URL = f"sqlite:///{METRICS_DB_PATH}"
 metrics_engine = create_engine(METRICS_URL, connect_args={"check_same_thread": False})
 MetricsSession = sessionmaker(autocommit=False, autoflush=False, bind=metrics_engine)

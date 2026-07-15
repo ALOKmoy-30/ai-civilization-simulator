@@ -14,7 +14,14 @@ if _data_dir_env:
 else:
     DATA_DIR = Path(__file__).parent.parent.parent.parent / "data_storage"
 DATA_DIR.mkdir(exist_ok=True)
-DB_PATH = DATA_DIR / "autosociety.db"
+
+# ── Environment isolation: tests get their own database, never the live one ──
+# pytest automatically sets PYTEST_CURRENT_TEST before any test module is imported.
+_is_testing = bool(os.getenv("PYTEST_CURRENT_TEST") or os.getenv("TESTING"))
+if _is_testing:
+    DB_PATH = DATA_DIR / "test_autosociety.db"
+else:
+    DB_PATH = DATA_DIR / "autosociety.db"
 DATABASE_URL = f"sqlite:///{DB_PATH}"
 
 # SQLAlchemy setup

@@ -14,13 +14,8 @@ from autosociety.backend.core.engine import SimulationEngine
 from autosociety.backend.routers import simulation
 
 
-def _reset_db():
-    """Drop and recreate all tables, seed 5 citizens."""
-    db.Base.metadata.drop_all(bind=db.engine)
-    db.Base.metadata.create_all(bind=db.engine)
-    met.MetricsBase.metadata.drop_all(bind=met.metrics_engine)
-    met.MetricsBase.metadata.create_all(bind=met.metrics_engine)
-
+def _seed_test_citizens():
+    """Seed 5 test citizens into the already-clean test DB (conftest.py handles drop/create)."""
     session = db.get_session()
     for i in range(5):
         db.create_citizen(session, db.CitizenCreate(
@@ -37,7 +32,7 @@ def _reset_db():
 
 @pytest.fixture(scope="function")
 def client():
-    _reset_db()
+    _seed_test_citizens()
     eng = SimulationEngine()
     simulation.set_engine(eng)
     from autosociety.backend.main import app

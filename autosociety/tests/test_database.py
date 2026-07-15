@@ -32,14 +32,10 @@ from autosociety.backend.core.database import (
 
 @pytest.fixture(scope="function")
 def db_session():
-    """Create a fresh database for each test. Uses drop/create to avoid Windows file locking."""
-    init_db()
+    """Provide a fresh session per test. Table setup/teardown handled by conftest.py."""
     session = get_session()
     yield session
     session.close()
-    # Drop tables instead of deleting the file (avoids Windows file-lock issues)
-    Base.metadata.drop_all(bind=engine)
-    Base.metadata.create_all(bind=engine)
 
 
 def test_create_citizen(db_session):
