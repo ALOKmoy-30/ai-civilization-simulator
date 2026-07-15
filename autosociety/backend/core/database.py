@@ -2,7 +2,7 @@ import os
 from datetime import datetime
 from pathlib import Path
 
-from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, Text, Boolean
+from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, Text, Boolean, text
 from sqlalchemy.orm import declarative_base, sessionmaker, Session
 from pydantic import BaseModel, ConfigDict
 from typing import Optional, List
@@ -18,7 +18,13 @@ DB_PATH = DATA_DIR / "autosociety.db"
 DATABASE_URL = f"sqlite:///{DB_PATH}"
 
 # SQLAlchemy setup
-engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
+engine = create_engine(
+    DATABASE_URL,
+    connect_args={"check_same_thread": False, "timeout": 30},
+    pool_size=20,
+    max_overflow=0,
+    pool_timeout=30,
+)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
@@ -170,8 +176,12 @@ class BusinessRead(BusinessCreate):
 # ==================== Database Initialization ====================
 
 def init_db():
-    """Create all tables."""
+    """Create all tables and enable WAL mode for concurrent access."""
     Base.metadata.create_all(bind=engine)
+    # WAL mode allows concurrent reads while writes are in progress
+    with engine.connect() as conn:
+        conn.execute(text("PRAGMA journal_mode=WAL"))
+        conn.execute(text("PRAGMA busy_timeout=10000"))
 
 
 def get_session() -> Session:
