@@ -78,6 +78,7 @@ def run_citizen_decision(citizen_id: int, situation: str) -> dict:
 
     result = crew.kickoff()
     decision_text = str(result)
+    readable_action = _clean_decision_output(decision_text)
 
     happiness_delta = _extract_delta(decision_text, "happiness", default=-2)
     wealth_delta = _extract_delta(decision_text, "wealth", default=-5)
@@ -93,8 +94,46 @@ def run_citizen_decision(citizen_id: int, situation: str) -> dict:
         "name": citizen.name,
         "situation": situation,
         "decision": decision_text,
+        "readable_action": readable_action,
         "effects": {"happiness_delta": happiness_delta, "wealth_delta": wealth_delta},
     }
+
+
+def _clean_decision_output(raw_text: str) -> str:
+    """Extract human-readable action and reasoning from raw LLM output (JSON or markdown)."""
+    import re
+    import json
+    text = raw_text.strip()
+
+    # Try to extract JSON from ```json ... ``` or raw {...} block
+    json_match = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", text, re.DOTALL)
+    if not json_match and text.startswith("{") and text.endswith("}"):
+        json_match = re.match(r"(\{.*\})", text, re.DOTALL)
+
+    if json_match:
+        try:
+            data = json.loads(json_match.group(1))
+            action = data.get("final_action") or data.get("action") or data.get("decision")
+            reasoning = data.get("reasoning") or data.get("thought") or data.get("explanation")
+            if action:
+                if reasoning and len(str(reasoning)) > 10:
+                    return f"{action} (Reasoning: {reasoning})"
+                return str(action)
+        except Exception:
+            pass
+
+    # Look for 'FINAL ACTION:' or 'Action:'
+    action_match = re.search(r"(?:FINAL\s+ACTION|ACTION|DECISION)\s*[:=]\s*(.+?)(?:\n\n|$)", text, re.IGNORECASE | re.DOTALL)
+    if action_match:
+        action_clean = action_match.group(1).strip()
+        action_clean = re.sub(r"```.*", "", action_clean, flags=re.DOTALL).strip()
+        if action_clean:
+            return action_clean
+
+    # Fallback: clean up raw markdown code blocks
+    cleaned = re.sub(r"```(?:json)?\s*|\s*```", "", text).strip()
+    cleaned = re.sub(r"\n+", " ", cleaned)
+    return cleaned[:300] if cleaned else "No explicit action recorded."
 
 
 def _extract_delta(text: str, key: str, default: int = 0) -> int:

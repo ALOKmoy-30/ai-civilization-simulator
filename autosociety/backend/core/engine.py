@@ -260,10 +260,15 @@ class SimulationEngine:
                 logger.info("Citizen %d done in %.1fs", cid, elapsed)
                 try:
                     s = get_session()
-                    action_preview = str(decision.get("decision", ""))[:120]
+                    action_preview = decision.get("readable_action") or str(decision.get("decision", ""))[:200]
+                    citizen_name = decision.get("name", f"Citizen {cid}")
+                    effects_info = decision.get("effects", {})
+                    h_delta = effects_info.get("happiness_delta", 0)
+                    w_delta = effects_info.get("wealth_delta", 0)
                     create_event(s,
                         description=(
-                            f"[Tick {self._tick}] Citizen {cid} decided: {action_preview}"
+                            f"{citizen_name}: {action_preview} "
+                            f"[Effects: Happiness {h_delta:+,}, Wealth ${w_delta:+,}]"
                         ),
                         event_type="citizen_action", severity=1,
                     )
