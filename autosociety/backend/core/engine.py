@@ -271,20 +271,52 @@ class SimulationEngine:
                 except Exception:
                     pass
 
-            except Exception as e:
+            except TimeoutError as e:
                 elapsed = time.monotonic() - citizen_start
                 per_citizen_times.append(elapsed)
                 logger.warning(
-                    "Citizen %d reasoning failed after %.1fs: %s",
-                    cid, elapsed, e, exc_info=True,
+                    "Citizen %d timed out after %.1fs (model too slow — "
+                    "consider reducing context or switching model)",
+                    cid, elapsed,
                 )
+                try:
+                    s = get_session()
+                    create_event(s,
+                        description=(
+                            f"[Tick {self._tick}] Citizen {cid} LLM timed out "
+                            f"after {elapsed:.0f}s. Skipping decision this tick."
+                        ),
+                        event_type="agent_timeout", severity=2,
+                    )
+                    s.close()
+                except Exception:
+                    pass
+
+            except Exception as e:
+                # Catches context-window overflow (litellm.ContextWindowExceededError),
+                # model-not-found errors, and any other unexpected failures.
+                elapsed = time.monotonic() - citizen_start
+                per_citizen_times.append(elapsed)
+                err_type = type(e).__name__
+                is_ctx = "context" in str(e).lower() or "window" in str(e).lower()
+                if is_ctx:
+                    logger.warning(
+                        "Citizen %d context window exceeded after %.1fs "
+                        "(prompt too long for 0.5B model — memory will be truncated next tick)",
+                        cid, elapsed,
+                    )
+                else:
+                    logger.warning(
+                        "Citizen %d reasoning failed after %.1fs: %s",
+                        cid, elapsed, e, exc_info=True,
+                    )
                 try:
                     s = get_session()
                     create_event(s,
                         description=(
                             f"[Tick {self._tick}] Citizen {cid} was unable to "
                             f"make a decision today. "
-                            f"(Error: {type(e).__name__}: {e})"
+                            f"(Error: {err_type}: {e})"
                         ),
                         event_type="agent_failure", severity=2,
                     )

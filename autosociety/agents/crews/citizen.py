@@ -4,7 +4,7 @@ from crewai import Agent, Task, Crew, Process
 
 from autosociety.backend.core.database import get_session, get_citizen, update_citizen, Citizen
 from autosociety.agents.tools.rag_search import create_rag_tool
-from autosociety.agents.llm_config import get_llm
+from autosociety.agents.llm_config import get_citizen_llm
 
 
 def build_citizen_agent(citizen_id: int) -> Agent:
@@ -38,7 +38,7 @@ def build_citizen_agent(citizen_id: int) -> Agent:
         ),
         verbose=False,
         allow_delegation=False,
-        llm=get_llm(),
+        llm=get_citizen_llm(),
         tools=[create_rag_tool(citizen_id)],
     )
 

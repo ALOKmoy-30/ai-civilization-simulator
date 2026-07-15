@@ -7,7 +7,7 @@ from autosociety.backend.core.database import (
     get_session, get_or_create_world_state, update_world_state,
     create_policy, PolicyCreate,
 )
-from autosociety.agents.llm_config import get_llm
+from autosociety.agents.llm_config import get_government_llm
 
 
 MINISTER_ROLES = {
@@ -42,7 +42,7 @@ class GovernmentCrew:
     """Assembles the Government ministers and runs policy decisions."""
 
     def __init__(self):
-        self.llm = get_llm(temperature=0.4)
+        self.llm = get_government_llm(temperature=0.4)
         self.ministers: Dict[str, Agent] = {}
         self._build_ministers()
 
