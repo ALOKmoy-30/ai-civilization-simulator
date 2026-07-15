@@ -1,11 +1,13 @@
 """
 Simulation Engine — runs the game loop on a background asyncio task.
 One tick = one simulated day. Offloads all CrewAI blocking calls to a thread pool.
+Includes rate-limit throttling and graceful fallbacks for agent failures.
 """
 
 import asyncio
 import logging
 import random
+import time
 from typing import Optional, Dict, Any
 
 from autosociety.backend.core.database import (
@@ -15,6 +17,11 @@ from autosociety.backend.core.database import (
 from autosociety.backend.core.scheduler import ActionScheduler
 from autosociety.backend.core.metrics import init_metrics_db, record_snapshot
 from autosociety.backend.core.config import world_config as cfg
+
+# Delay in seconds between individual citizen reasoning calls to avoid 429 bursts
+CITIZEN_REASONING_DELAY = 1.5
+# Delay after government policy session to let rate limits recover
+GOVERNMENT_REASONING_DELAY = 3.0
 from autosociety.backend.core.world_rules import calculate_wage, calculate_tax, calculate_wealth_tax
 from autosociety.backend.core.disasters import should_disaster_occur, apply_disaster
 
@@ -223,12 +230,22 @@ class SimulationEngine:
         if reasoning_set:
             await self._run_reasoning_batch(reasoning_set)
 
+        # Government policy session every TICKS_PER_MONTH ticks
+        if self._tick % cfg.TICKS_PER_MONTH == 0:
+            await self._run_government_session()
+
     async def _run_reasoning_batch(self, citizen_ids):
-        """Run CrewAI reasoning for selected citizens in thread pool."""
+        """Run CrewAI reasoning for selected citizens in thread pool.
+
+        Inserts a deliberate delay between each citizen to avoid
+        bursting 429 rate limits on the Gemini proxy.
+        """
         from autosociety.agents.crews.citizen import run_citizen_decision
 
-        for cid in citizen_ids:
+        total = len(citizen_ids)
+        for i, cid in enumerate(citizen_ids, 1):
             try:
+                logger.info("Citizen %d reasoning (%d/%d)...", cid, i, total)
                 await asyncio.to_thread(
                     run_citizen_decision,
                     cid,
@@ -236,3 +253,71 @@ class SimulationEngine:
                 )
             except Exception as e:
                 logger.warning("Citizen %d reasoning failed: %s", cid, e)
+                # Log citizen failure as a visible world event
+                try:
+                    session = get_session()
+                    create_event(
+                        session,
+                        description=(
+                            f"Citizen {cid} was unable to make a decision today "
+                            f"due to cognitive overload. (Error: {type(e).__name__})"
+                        ),
+                        event_type="agent_failure",
+                        severity=2,
+                    )
+                    session.close()
+                except Exception:
+                    pass  # Don't let event logging crash the loop
+
+            # Throttle: sleep between citizen calls to space out API traffic
+            if i < total:
+                await asyncio.sleep(CITIZEN_REASONING_DELAY)
+
+    async def _run_government_session(self):
+        """Run a government policy session with graceful fallback.
+
+        If the GovernmentCrew fails (rate-limit, timeout, LLM error),
+        log a descriptive world event and continue without crashing.
+        """
+        from autosociety.agents.crews.government import GovernmentCrew
+
+        logger.info("Tick %d: Government policy session starting...", self._tick)
+        try:
+            result = await asyncio.to_thread(
+                self._sync_government_session,
+                f"Monthly review at day {self._tick}.",
+            )
+            logger.info(
+                "Government enacted policy: %s (effects: %s)",
+                result.get("name", "Unknown"),
+                result.get("effects", {}),
+            )
+        except Exception as e:
+            logger.warning(
+                "Government policy session failed: %s — logging fallback event", e
+            )
+            # Log a lore-friendly world event so the UI shows what happened
+            try:
+                session = get_session()
+                create_event(
+                    session,
+                    description=(
+                        "Government session delayed due to administrative backlog. "
+                        "Ministers were unable to reach consensus this month. "
+                        f"(Technical: {type(e).__name__}: {str(e)[:120]})"
+                    ),
+                    event_type="government_failure",
+                    severity=3,
+                )
+                session.close()
+            except Exception:
+                pass  # Don't let event logging crash the loop
+
+        # Extra cooldown after government session (6 LLM calls)
+        await asyncio.sleep(GOVERNMENT_REASONING_DELAY)
+
+    def _sync_government_session(self, situation: str) -> Dict[str, Any]:
+        """Synchronous wrapper for GovernmentCrew.decide_policy()."""
+        from autosociety.agents.crews.government import GovernmentCrew
+        gov = GovernmentCrew()
+        return gov.decide_policy(situation)
