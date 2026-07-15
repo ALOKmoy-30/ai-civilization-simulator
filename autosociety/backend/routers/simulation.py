@@ -60,7 +60,7 @@ async def start_simulation():
     """Start the simulation background loop."""
     eng = get_engine()
     if eng.is_running:
-        raise HTTPException(status_code=409, detail="Simulation already running")
+        return StatusResponse(status="ok", message="Simulation is already running")
     eng.start()
     return StatusResponse(status="ok", message="Simulation started")
 
@@ -70,9 +70,9 @@ async def pause_simulation():
     """Pause the simulation. Tick progression stops."""
     eng = get_engine()
     if not eng.is_running:
-        raise HTTPException(status_code=409, detail="Simulation not running")
+        return StatusResponse(status="ok", message="Simulation is not running")
     if eng.is_paused:
-        raise HTTPException(status_code=409, detail="Simulation already paused")
+        return StatusResponse(status="ok", message="Simulation is already paused")
     eng.pause()
     return StatusResponse(status="ok", message="Simulation paused")
 
@@ -82,9 +82,9 @@ async def resume_simulation():
     """Resume a paused simulation."""
     eng = get_engine()
     if not eng.is_running:
-        raise HTTPException(status_code=409, detail="Simulation not running")
+        return StatusResponse(status="ok", message="Simulation is not running")
     if not eng.is_paused:
-        raise HTTPException(status_code=409, detail="Simulation not paused")
+        return StatusResponse(status="ok", message="Simulation is not paused")
     eng.resume()
     return StatusResponse(status="ok", message="Simulation resumed")
 
@@ -94,7 +94,7 @@ async def stop_simulation():
     """Stop the simulation entirely."""
     eng = get_engine()
     if not eng.is_running:
-        raise HTTPException(status_code=409, detail="Simulation not running")
+        return StatusResponse(status="ok", message="Simulation is not running")
     eng.stop()
     return StatusResponse(status="ok", message="Simulation stopped")
 
@@ -104,6 +104,6 @@ async def reset_simulation():
     """Reset simulation to tick 0. Must be stopped first."""
     eng = get_engine()
     if eng.is_running:
-        raise HTTPException(status_code=409, detail="Stop simulation first")
+        eng.stop()
     eng.reset()
     return StatusResponse(status="ok", message="Simulation reset to tick 0")

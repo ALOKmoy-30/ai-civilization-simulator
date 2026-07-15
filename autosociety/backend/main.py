@@ -7,6 +7,10 @@ Wires the engine, simulation control, and query routers together.
 from dotenv import load_dotenv
 load_dotenv()
 
+import litellm
+# Enable robust retry logic on all LLM completions (e.g., 429 RateLimitErrors)
+litellm.num_retries = 5
+
 import logging
 from contextlib import asynccontextmanager
 

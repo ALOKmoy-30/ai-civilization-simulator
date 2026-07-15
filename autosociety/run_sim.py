@@ -12,6 +12,7 @@ import sys
 import subprocess
 import signal
 import time
+import os
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).parent.parent
@@ -47,13 +48,17 @@ def main():
 
     backend = subprocess.Popen(
         backend_cmd, cwd=PROJECT_ROOT,
-        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
     )
     time.sleep(2)
 
+    # Verify backend actually started
+    if backend.poll() is not None:
+        print("\n  ❌ Backend failed to start! Check errors above.")
+        sys.exit(1)
+
     frontend = subprocess.Popen(
         frontend_cmd, cwd=PROJECT_ROOT,
-        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        stdout=subprocess.DEVNULL,  # Streamlit is noisy; keep backend visible
     )
 
     def shutdown(sig, frame):

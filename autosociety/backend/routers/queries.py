@@ -132,23 +132,24 @@ async def get_policies():
 @router.get("/events", response_model=List[EventResponse])
 async def get_events(limit: int = Query(50, ge=1, le=500)):
     """List recent events."""
-    from autosociety.backend.core.database import SimulationLog, SessionLocal
+    from autosociety.backend.core.database import Event, SessionLocal
     session = SessionLocal()
     events = (
-        session.query(SimulationLog)
-        .order_by(SimulationLog.id.desc())
+        session.query(Event)
+        .order_by(Event.id.desc())
         .limit(limit)
         .all()
     )
     session.close()
     return [
         EventResponse(
-            id=e.id, description=e.details,
-            event_type=e.action, severity=1,
-            created_at=e.timestamp,
+            id=e.id, description=e.description,
+            event_type=e.event_type, severity=e.severity,
+            created_at=e.created_at,
         )
         for e in events
     ]
+
 
 
 @router.get("/analytics", response_model=AnalyticsListResponse)
