@@ -50,6 +50,7 @@ class EventResponse(BaseModel):
     event_type: str
     severity: int
     created_at: datetime
+    affected_citizens: Optional[str] = None
 
 
 class AnalyticsResponse(BaseModel):
@@ -146,6 +147,7 @@ async def get_events(limit: int = Query(50, ge=1, le=500)):
             id=e.id, description=e.description,
             event_type=e.event_type, severity=e.severity,
             created_at=e.created_at,
+            affected_citizens=e.affected_citizens,
         )
         for e in events
     ]
