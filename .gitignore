@@ -1,4 +1,8 @@
+# Environment secrets — never commit real keys
+.env
+
 # Byte-compiled / optimized / DLL files
+
 __pycache__/
 *.py[cod]
 *$py.class

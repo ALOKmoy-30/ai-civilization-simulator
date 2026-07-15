@@ -3,6 +3,10 @@ FastAPI application for AutoSociety.
 Wires the engine, simulation control, and query routers together.
 """
 
+# Load .env before any module reads os.getenv()
+from dotenv import load_dotenv
+load_dotenv()
+
 import logging
 from contextlib import asynccontextmanager
 
