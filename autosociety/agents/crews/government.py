@@ -9,15 +9,28 @@ from autosociety.backend.core.database import (
 )
 
 
-def _build_llm():
+def _build_llm(temperature: float = 0.4):
+    """Build a CrewAI LLM, routing through 9Router proxy if GEMINI_API_BASE is set."""
     api_key = os.getenv("GEMINI_API_KEY")
     if not api_key:
         raise ValueError("GEMINI_API_KEY env var not set")
-    return LLM(
-        model="gemini/gemini-2.0-flash",
-        api_key=api_key,
-        temperature=0.4,
-    )
+    api_base = os.getenv("GEMINI_API_BASE")  # e.g. http://localhost:20128/v1
+
+    if api_base:
+        # Route through 9Router OpenAI-compatible proxy via LiteLLM
+        return LLM(
+            model="openai/gemini-2.0-flash",
+            api_key=api_key,
+            base_url=api_base,
+            temperature=temperature,
+        )
+    else:
+        # Direct Gemini access (no proxy)
+        return LLM(
+            model="gemini/gemini-2.0-flash",
+            api_key=api_key,
+            temperature=temperature,
+        )
 
 
 MINISTER_ROLES = {
