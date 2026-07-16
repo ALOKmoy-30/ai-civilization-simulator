@@ -19,7 +19,7 @@ def _backup(path):
         ts = datetime.now().strftime("%Y%m%d_%H%M%S")
         backup = path.with_name(f"{path.stem}_{ts}.bak")
         shutil.copy2(path, backup)
-        print(f"  Backed up → {backup.name}")
+        print(f"  Backed up -> {backup.name}")
 
 
 def reset():
