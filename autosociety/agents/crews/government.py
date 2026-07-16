@@ -5,7 +5,7 @@ from crewai import Agent, Task, Crew, Process
 
 from autosociety.backend.core.database import (
     get_session, get_or_create_world_state, update_world_state,
-    create_policy, PolicyCreate,
+    create_policy, PolicyCreate, create_event,
 )
 from autosociety.agents.llm_config import get_government_llm
 
@@ -177,22 +177,34 @@ class GovernmentCrew:
         new_stability = max(0, min(100, world.political_stability + effects.get("political_stability", 0)))
         new_economic = max(0, min(100, world.economic_health + effects.get("economic_health", 0)))
 
+        # The engine tick counter controls simulation_day — government must NOT increment it.
+        # Only update the macro indicators driven by this policy.
         update_world_state(session, {
             "avg_happiness": new_happiness,
             "political_stability": new_stability,
             "economic_health": new_economic,
-            "simulation_day": world.simulation_day + 1,
         })
 
+        import json
         policy = create_policy(session, PolicyCreate(
             name=policy_name,
             description=description,
-            effects=str(effects),
+            effects=json.dumps(effects),
+            reasoning_summary=decision_text,
+            enacted_day=world.simulation_day,
+            decision_status=decision_status,
         ))
+        policy_id = policy.id
+        create_event(
+            session,
+            description=f"Governor {decision_status} policy: {policy_name}",
+            event_type="policy",
+            severity=4 if decision_status == "approved" else 2,
+        )
         session.close()
 
         return {
-            "policy_id": policy.id,
+            "policy_id": policy_id,
             "name": policy_name,
             "description": description,
             "effects": effects,

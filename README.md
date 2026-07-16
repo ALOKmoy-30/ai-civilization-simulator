@@ -37,12 +37,16 @@ Our dedicated advanced analytics dashboard displaying correlation matrices, dist
 1. **Hybrid LLM Architecture (Ollama local inference)**:
    - **Citizens (0.5B Model)**: Standard citizen decision loops run sequentially using `qwen2.5-coder:0.5b` to prevent CPU choking, completing decisions in ~15-30s.
    - **Government (3B Model)**: Structural policy work runs on `qwen2.5-coder:3b` (`autosociety-qwen`) for complex multi-step reasoning.
-2. **Database Resilience & Automated Backups**:
-   - Any destructive action (like database reset or seeding) automatically backs up the database to timestamped `.bak` files.
-   - Separate databases for metrics logs (`metrics.db`) and world state (`autosociety.db`).
-3. **Environment & Test Suite Isolation**:
+2. **Symmetrical Day-to-Tick Engine**:
+   - 1 Simulation Tick maps symmetrically and translates mathematically to 1 Day in the world timeline. The backend engine serves as the single authority on simulation day.
+3. **Resilient Database Backups & Restoration**:
+   - Every simulation initialization or manual reset triggers an automatic, concurrent backup of the active database (`autosociety.db`) and historical metrics database (`metrics.db`) as WAL-safe timestamped companion files in `data_storage/backups/`.
+   - Past run snapshots are dynamically merged and restored on the Historical Analytics dashboard for comparative multi-run chart overlays.
+4. **Advanced Event Analytics**:
+   - Deep Analytics page features select-box filtering by event types (Crimes, Disasters, Policies, Agent Failures, Economic) and keyword search over the logs table, processed via server-side SQLite query filters.
+5. **Environment & Test Suite Isolation**:
    - Automated tests run against separate in-memory / temporary SQLite files (`test_autosociety.db` and `test_metrics.db`), guaranteeing that running tests never corrupts or deletes live simulation progress.
-4. **Windows Socket Stability**:
+6. **Windows Socket Stability**:
    - Includes custom proactor-loop monkey-patches preventing standard library `ConnectionResetError: [WinError 10054]` crashes on Windows.
 
 ---

@@ -167,3 +167,65 @@ class TestQueries:
                       "/queries/analytics", "/queries/reports"]:
             r = client.get(path)
             assert r.status_code == 200, f"{path} returned {r.status_code}"
+
+    def test_analytics_has_simulation_day(self, client):
+        """Every analytics snapshot must carry a simulation_day field."""
+        from autosociety.backend.core.metrics import record_snapshot
+        record_snapshot(tick=1, simulation_day=1, gdp=500.0,
+                        crime_rate=0.05, tax_revenue=75.0, active_businesses=0)
+        r = client.get("/queries/analytics")
+        assert r.status_code == 200
+        snapshots = r.json()["snapshots"]
+        if snapshots:
+            for snap in snapshots:
+                assert "simulation_day" in snap, (
+                    "simulation_day field missing from /queries/analytics response"
+                )
+
+    def test_backups_endpoint(self, client):
+        """GET /queries/backups should return a JSON list (may be empty)."""
+        r = client.get("/queries/backups")
+        assert r.status_code == 200
+        assert isinstance(r.json(), list)
+
+    def test_historical_analytics_endpoint(self, client):
+        """GET /queries/analytics/historical should return a JSON list."""
+        r = client.get("/queries/analytics/historical")
+        assert r.status_code == 200
+        assert isinstance(r.json(), list)
+
+    def test_events_filtering_by_type_and_search(self, client):
+        """Verify optional event_type and search_query parameters on /queries/events."""
+        session = db.get_session()
+        db.create_event(session, description="Burglary reported at downtown store", event_type="Crime", severity=4)
+        db.create_event(session, description="Massive storm hit the northern sector", event_type="Disaster", severity=8)
+        db.create_event(session, description="Tax rate policy updated by cabinet", event_type="Policy", severity=2)
+        session.close()
+
+        # Test filtering by event_type
+        r = client.get("/queries/events?event_type=Crime")
+        assert r.status_code == 200
+        events = r.json()
+        assert all(e["event_type"] == "Crime" for e in events)
+        assert any("Burglary" in e["description"] for e in events)
+
+        # Test search_query
+        r = client.get("/queries/events?search_query=storm")
+        assert r.status_code == 200
+        events = r.json()
+        assert len(events) >= 1
+        assert all("storm" in e["description"].lower() for e in events)
+
+        # Test min_severity
+        r = client.get("/queries/events?min_severity=6")
+        assert r.status_code == 200
+        events = r.json()
+        assert all(e["severity"] >= 6 for e in events)
+
+        # Test event_types endpoint
+        r = client.get("/queries/events/types")
+        assert r.status_code == 200
+        types = r.json()
+        assert "Crime" in types
+        assert "Disaster" in types
+        assert "Policy" in types

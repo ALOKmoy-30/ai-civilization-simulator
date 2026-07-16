@@ -1,5 +1,6 @@
 """Government Panel — active agents, policies, events, and reports."""
 
+import json
 import streamlit as st
 import pandas as pd
 
@@ -41,26 +42,102 @@ if state:
     c1.metric("Political Stability", f'{state.get("political_stability", 0):.1f}')
     c2.metric("Economic Health", f'{state.get("economic_health", 0):.1f}')
     c3.metric("Avg Happiness", f'{state.get("avg_happiness", 0):.1f}')
-    c4.metric("Day", state.get("tick", 0))
+    c4.metric("Day", state.get("simulation_day", state.get("tick", 0)))
 
 st.divider()
 
 # ── Policies ──────────────────────────────────────────────────────
 
 st.subheader("📜 Enacted Policies")
+
+# Effect keys to display with nice labels and emoji
+_EFFECT_LABELS = {
+    "economic_health":      ("💹 Economic Health",    "normal"),
+    "avg_happiness":        ("😊 Avg Happiness",       "normal"),
+    "political_stability":  ("⚖️ Political Stability", "normal"),
+    "wealth":               ("💰 Wealth",              "normal"),
+    "health":               ("🏥 Health",              "normal"),
+    "crime_rate":           ("🔒 Crime Rate",          "inverse"),  # negative = good
+    "tax_revenue":          ("🏦 Tax Revenue",         "normal"),
+}
+
+def _status_badge(status: str) -> str:
+    """Return a coloured emoji badge for approval status."""
+    s = (status or "approved").lower()
+    if "approved" in s:
+        return "✅ Approved"
+    if "rejected" in s:
+        return "❌ Rejected"
+    if "modified" in s:
+        return "🔄 Modified"
+    return f"📋 {status.title()}"
+
+
 policies = api_get("/queries/policies")
+
 if policies:
-    df = pd.DataFrame(policies)
-    if not df.empty:
-        cols = ["id", "name", "description", "is_active", "created_at"]
-        display_cols = [c for c in cols if c in df.columns]
-        st.dataframe(
-            df[display_cols].sort_values("id", ascending=False),
-            width="stretch", hide_index=True,
-        )
-        st.caption(f"Total policies: {len(policies)}")
-    else:
-        st.info("No policies enacted yet.")
+    # Sort newest first
+    policies_sorted = sorted(policies, key=lambda p: p.get("id", 0), reverse=True)
+
+    for policy in policies_sorted:
+        name = policy.get("name", "Unnamed Policy")
+        description = policy.get("description", "No description available.")
+        enacted_day = policy.get("enacted_day")
+        decision_status = policy.get("decision_status", "approved")
+        effects_parsed = policy.get("effects_parsed", {})
+        reasoning_summary = policy.get("reasoning_summary", "")
+        is_active = policy.get("is_active", True)
+
+        day_label = f"Day {enacted_day}" if enacted_day is not None else "Day unknown"
+        active_badge = "🟢 Active" if is_active else "🔴 Inactive"
+
+        with st.container(border=True):
+            # ── Header row
+            header_cols = st.columns([6, 2, 2])
+            with header_cols[0]:
+                st.markdown(f"#### {name}")
+            with header_cols[1]:
+                st.markdown(f"**{_status_badge(decision_status)}**")
+            with header_cols[2]:
+                st.markdown(f"**{active_badge}** &nbsp;|&nbsp; 📅 {day_label}")
+
+            # ── Description
+            st.markdown(f"*{description}*")
+
+            # ── Ministerial adjustments
+            if effects_parsed:
+                st.markdown("**📊 Ministerial Adjustments:**")
+                effect_cols = st.columns(min(len(effects_parsed), 4))
+                for idx, (key, val) in enumerate(effects_parsed.items()):
+                    label_text, direction = _EFFECT_LABELS.get(key, (f"🔧 {key.replace('_', ' ').title()}", "normal"))
+                    col_idx = idx % 4
+                    with effect_cols[col_idx]:
+                        # Invert delta colour for "inverse" metrics (e.g. crime_rate)
+                        display_val = val
+                        if direction == "inverse":
+                            display_val = -val  # show green for crime reduction
+                        delta_str = f"{'+' if val >= 0 else ''}{val}"
+                        st.metric(label_text, delta_str, delta=display_val)
+            else:
+                st.caption("_No numeric adjustments recorded._")
+
+            # ── Reasoning summary (collapsible)
+            if reasoning_summary:
+                with st.expander("🧠 Governor Reasoning & LLM Output"):
+                    # Show a cleaner excerpt first, full text available
+                    st.text_area(
+                        "Full reasoning text",
+                        value=reasoning_summary,
+                        height=200,
+                        disabled=True,
+                        key=f"reasoning_{policy.get('id', 0)}",
+                        label_visibility="collapsed",
+                    )
+            else:
+                st.caption("_No reasoning summary available (policy created before this feature was added)._")
+
+    st.caption(f"Total policies: {len(policies)}")
+
 else:
     st.info("No policies found. The government meets every policy cycle to enact new policies.")
 

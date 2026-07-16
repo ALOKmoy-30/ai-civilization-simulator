@@ -7,9 +7,9 @@ import time
 API_BASE = "http://localhost:8243"
 
 
-def api_get(path: str, timeout: int = 3):
+def api_get(path: str, params: dict = None, timeout: int = 3):
     try:
-        r = requests.get(f"{API_BASE}{path}", timeout=timeout)
+        r = requests.get(f"{API_BASE}{path}", params=params, timeout=timeout)
         r.raise_for_status()
         return r.json()
     except requests.RequestException:

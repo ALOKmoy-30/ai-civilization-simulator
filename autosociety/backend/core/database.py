@@ -71,7 +71,10 @@ class Policy(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, unique=True, index=True)
     description = Column(Text)
-    effects = Column(Text)  # JSON string of effects
+    effects = Column(Text)              # JSON string of numeric effects
+    reasoning_summary = Column(Text)    # Raw LLM reasoning / Governor ORDER text
+    enacted_day = Column(Integer)       # simulation_day when this policy was passed
+    decision_status = Column(String, default="approved")  # approved / rejected / modified
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -154,6 +157,9 @@ class PolicyCreate(BaseModel):
     name: str
     description: str
     effects: str
+    reasoning_summary: Optional[str] = None
+    enacted_day: Optional[int] = None
+    decision_status: Optional[str] = "approved"
 
 
 class PolicyRead(PolicyCreate):
@@ -182,13 +188,34 @@ class BusinessRead(BusinessCreate):
 
 # ==================== Database Initialization ====================
 
+def _apply_policy_migrations(conn):
+    """
+    Safe, idempotent ALTER TABLE migrations for the Policy table.
+    Adds new columns introduced after the initial schema if they don't exist.
+    """
+    new_columns = [
+        ("reasoning_summary", "TEXT"),
+        ("enacted_day", "INTEGER"),
+        ("decision_status", "VARCHAR"),
+    ]
+    for col_name, col_type in new_columns:
+        try:
+            conn.execute(text(f"ALTER TABLE policies ADD COLUMN {col_name} {col_type}"))
+            conn.commit()
+        except Exception:
+            # Column already exists — normal for any DB created after this schema version
+            pass
+
+
 def init_db():
-    """Create all tables and enable WAL mode for concurrent access."""
+    """Create all tables, enable WAL mode, and apply pending migrations."""
     Base.metadata.create_all(bind=engine)
-    # WAL mode allows concurrent reads while writes are in progress
     with engine.connect() as conn:
+        # WAL mode allows concurrent reads while writes are in progress
         conn.execute(text("PRAGMA journal_mode=WAL"))
         conn.execute(text("PRAGMA busy_timeout=10000"))
+        # Apply schema migrations for existing databases
+        _apply_policy_migrations(conn)
 
 
 def get_session() -> Session:

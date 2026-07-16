@@ -1,8 +1,11 @@
 import asyncio
+import logging
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from autosociety.backend.core.engine import SimulationEngine
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/simulation", tags=["simulation"])
 
@@ -101,9 +104,27 @@ async def stop_simulation():
 
 @router.post("/reset", response_model=StatusResponse)
 async def reset_simulation():
-    """Reset simulation to tick 0. Must be stopped first."""
+    """Reset simulation to tick 0 and archive previous run."""
     eng = get_engine()
     if eng.is_running:
         eng.stop()
+
+    # Create a backup of the completed run before resetting
+    try:
+        from autosociety.backend.core.backup import create_backup
+        create_backup(label="reset")
+    except Exception as e:
+        logger.warning("Backup before reset failed: %s", e)
+
     eng.reset()
-    return StatusResponse(status="ok", message="Simulation reset to tick 0")
+
+    # Clear metrics table for the fresh run so ticks start cleanly from 0
+    try:
+        from autosociety.backend.core.metrics import metrics_engine, text
+        with metrics_engine.connect() as conn:
+            conn.execute(text("DELETE FROM tick_snapshots"))
+            conn.commit()
+    except Exception as e:
+        logger.warning("Clearing metrics table on reset failed: %s", e)
+
+    return StatusResponse(status="ok", message="Simulation reset to tick 0 and run archived")

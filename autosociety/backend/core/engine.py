@@ -171,16 +171,23 @@ class SimulationEngine:
                     "wealth": round(max(0, citizen.wealth - fine), 2),
                     "happiness": round(max(0, citizen.happiness - 5), 2),
                 })
+                create_event(
+                    session,
+                    description=f"Crime committed by {citizen.name} (ID {citizen.id}) — fined ${fine:.2f}",
+                    event_type="crime",
+                    severity=min(10, max(2, int(fine / 50) + 2)),
+                )
             else:
                 update_citizen(session, citizen.id, {
                     "wealth": round(max(0, citizen.wealth + net_income), 2),
                 })
             total_gdp += wage
             total_tax += tax + wealth_tax
-        world = get_or_create_world_state(session)
+        # The engine tick counter is the single authority on simulation_day.
+        # 1 tick = 1 day exactly. Government crew must NOT increment simulation_day.
         update_world_state(session, {
-            "simulation_day": world.simulation_day + 1,
-            "total_wealth": world.total_wealth + total_gdp,
+            "simulation_day": self._tick,
+            "total_wealth": get_or_create_world_state(session).total_wealth + total_gdp,
         })
         session.close()
         return {"total_gdp": total_gdp, "crime_rate": crime_events / max(1, len(citizens)),
@@ -196,9 +203,13 @@ class SimulationEngine:
         self._last_crime_rate = result["crime_rate"]
         self._last_active_businesses = 0
         tax_revenue = result.get("tax_revenue", 0)
+        # Pass simulation_day explicitly — 1 tick = 1 day (perfectly synchronized)
         record_snapshot(
-            tick=self._tick, gdp=self._last_gdp,
-            crime_rate=self._last_crime_rate, tax_revenue=tax_revenue,
+            tick=self._tick,
+            simulation_day=self._tick,
+            gdp=self._last_gdp,
+            crime_rate=self._last_crime_rate,
+            tax_revenue=tax_revenue,
             active_businesses=0,
         )
         if reasoning_set:

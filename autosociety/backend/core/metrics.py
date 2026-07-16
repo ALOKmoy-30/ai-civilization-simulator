@@ -10,7 +10,7 @@ from datetime import datetime
 from typing import List, Dict, Any, Optional
 from pathlib import Path
 
-from sqlalchemy import Column, Integer, Float, DateTime, create_engine
+from sqlalchemy import Column, Integer, Float, DateTime, create_engine, text
 from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.orm import declarative_base
 
@@ -39,6 +39,9 @@ class TickSnapshot(MetricsBase):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     tick = Column(Integer, index=True)
+    # simulation_day mirrors tick 1:1 (1 tick = 1 day). Stored separately
+    # so it can diverge in future time-scaling experiments without a schema change.
+    simulation_day = Column(Integer, index=True)
     population = Column(Integer)
     avg_happiness = Column(Float)
     avg_wealth = Column(Float)
@@ -54,16 +57,39 @@ class TickSnapshot(MetricsBase):
 
 
 def init_metrics_db():
-    """Create the metrics table if it doesn't exist."""
+    """Create the metrics table if it doesn't exist, and apply any pending migrations."""
     MetricsBase.metadata.create_all(bind=metrics_engine)
+    # Safe migration: add simulation_day column if it doesn't exist yet
+    # (for databases created before this column was introduced)
+    with metrics_engine.connect() as conn:
+        try:
+            conn.execute(text("ALTER TABLE tick_snapshots ADD COLUMN simulation_day INTEGER"))
+            conn.commit()
+        except Exception:
+            # Column already exists — this is the expected path after first migration
+            pass
 
 
 def record_snapshot(tick: int, gdp: float, crime_rate: float,
                     tax_revenue: float, active_businesses: int,
+                    simulation_day: Optional[int] = None,
                     extra: Optional[Dict[str, float]] = None) -> TickSnapshot:
     """
     Record a single tick's snapshot. Appends a row — never modifies history.
+
+    Args:
+        tick: The current engine tick counter.
+        gdp: Total wages generated this tick.
+        crime_rate: Fraction of citizens who committed a crime.
+        tax_revenue: Total tax collected this tick.
+        active_businesses: Number of active businesses.
+        simulation_day: The canonical simulation day (defaults to tick if not provided).
+        extra: Optional dict of additional fields (reserved for future use).
     """
+    # Default: 1 tick = 1 day
+    if simulation_day is None:
+        simulation_day = tick
+
     init_metrics_db()
     session = get_session()
     citizens = list_citizens(session)
@@ -83,6 +109,7 @@ def record_snapshot(tick: int, gdp: float, crime_rate: float,
     m_session = MetricsSession()
     snapshot = TickSnapshot(
         tick=tick,
+        simulation_day=simulation_day,
         population=num_citizens,
         avg_happiness=round(avg_happiness, 2),
         avg_wealth=round(avg_wealth, 2),
@@ -120,13 +147,15 @@ def export_metrics_csv() -> str:
     output = io.StringIO()
     writer = csv.writer(output)
     writer.writerow([
-        "tick", "population", "avg_happiness", "avg_wealth", "avg_health",
+        "tick", "simulation_day", "population", "avg_happiness", "avg_wealth", "avg_health",
         "employment_rate", "gdp", "crime_rate", "tax_revenue",
         "active_businesses", "political_stability", "economic_health",
     ])
     for s in snapshots:
         writer.writerow([
-            s.tick, s.population, s.avg_happiness, s.avg_wealth, s.avg_health,
+            s.tick,
+            s.simulation_day if s.simulation_day is not None else s.tick,
+            s.population, s.avg_happiness, s.avg_wealth, s.avg_health,
             s.employment_rate, s.gdp, s.crime_rate, s.tax_revenue,
             s.active_businesses, s.political_stability, s.economic_health,
         ])

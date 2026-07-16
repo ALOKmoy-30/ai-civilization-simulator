@@ -96,6 +96,14 @@ async def lifespan(app: FastAPI):
     logger.info("AutoSociety API starting up")
     init_db()
     init_metrics_db()
+    # Create a timestamped backup of the current database on every server boot.
+    # Uses VACUUM INTO which is WAL-safe even while the DB file is open.
+    try:
+        from autosociety.backend.core.backup import create_backup, BACKUPS_DIR
+        backup_path = create_backup()
+        logger.info("Startup backup created: %s", backup_path.name)
+    except Exception as e:
+        logger.warning("Startup backup failed (non-fatal): %s", e)
     await _check_ollama()
     sim_router.set_engine(engine)
     yield

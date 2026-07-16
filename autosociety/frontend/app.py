@@ -117,7 +117,8 @@ state = st.session_state.world_state
 if state:
     m_cols = st.columns(6)
     with m_cols[0]:
-        st.metric("📅 Day", state.get("tick", 0))
+        sim_day = state.get("simulation_day", state.get("tick", 0))
+        st.metric("📅 Day", sim_day)
     with m_cols[1]:
         st.metric("👥 Population", state.get("population", 0))
     with m_cols[2]:
