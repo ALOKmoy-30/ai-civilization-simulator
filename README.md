@@ -6,81 +6,96 @@ AutoSociety is an interactive multi-agent civilization simulator built on top of
 
 ## 📸 Visual Tour
 
-<!-- SCREENSHOT_INSTRUCTIONS
-To display the screenshots correctly on GitHub, please capture the relevant views from the application and save them into the `docs/screenshots/` directory with the exact filenames specified below.
--->
+All screenshots below live in `assets/screenshots/`. See the [Screenshot Capture Checklist](#-screenshot-capture-checklist) at the bottom for how to regenerate them.
 
-### 🖥️ 1. Simulation Control & Live Events Feed
-The home dashboard allows starting, pausing, and resetting the simulation. It streams a real-time event log mapping each citizen's decisions and effects.
-<!-- SCREENSHOT_PLACEHOLDER: Save a screenshot of the main dashboard as docs/screenshots/dashboard_overview.png -->
-![Dashboard Overview](docs/screenshots/dashboard_overview.png)
+### 🖥️ 1. Simulation Dashboard — Fully Loaded
 
-### 📊 2. Macro Analytics & Wealth Distribution
-Displays society-wide averages, GDP trends, and Gini coefficient over time, helping track inequality and standard of living metrics.
-<!-- SCREENSHOT_PLACEHOLDER: Save a screenshot of macro analytics charts as docs/screenshots/macro_analytics.png -->
-![Macro Analytics](docs/screenshots/macro_analytics.png)
+The main dashboard after several ticks of simulation. The key metrics row shows tick count, population, average happiness, wealth, and health. The live charts below track GDP and average wealth over time as the simulation progresses.
 
-### 🧠 3. Hybrid LLM Model Performance Stats
-View the execution time, token metrics, and performance analytics comparing citizen models and government models to track CPU usage and decision latency.
-<!-- SCREENSHOT_PLACEHOLDER: Save a screenshot of the model execution speed and stats as docs/screenshots/hybrid_model_stats.png -->
-![Hybrid Model Stats](docs/screenshots/hybrid_model_stats.png)
-
-### 👑 4. Government Policy Chamber & Enacted Policies
-Every month, the Finance, Police, Education, and Health Ministers analyze the state of the society and propose bills. The Policy Coordinator resolves contradictions, and the Governor issues final approvals.
-<!-- SCREENSHOT_PLACEHOLDER: Save a screenshot of the government panel view as docs/screenshots/government_panel.png -->
-![Government Policy Chamber](docs/screenshots/government_panel.png)
-
-The **Enacted Policies** sub-panel tracks the history of all passed bills, their economic parameters (such as tax rates, public spending), and their direct impact on key metrics over time.
-<!-- SCREENSHOT_PLACEHOLDER: Save a screenshot of the enacted policies table as docs/screenshots/enacted_policies.png -->
-![Enacted Policies](docs/screenshots/enacted_policies.png)
-
-### 👥 5. Citizen Registry & Agent Memory
-Explore the status of all 30 citizens. View their jobs, financial standing, happiness levels, and recent decisions.
-<!-- SCREENSHOT_PLACEHOLDER: Save a screenshot of the citizens registry view as docs/screenshots/citizen_registry.png -->
-![Citizen Registry](docs/screenshots/citizen_registry.png)
-
-### 🔍 6. Deep Analytics & Events Search Log
-Our dedicated advanced analytics dashboard displaying correlation matrices, distribution curves, and a structured history of all events. Features select-box filtering by event types (Crimes, Disasters, Policies, Agent Failures, Economic) and keyword search over the logs table.
-<!-- SCREENSHOT_PLACEHOLDER: Save a screenshot of the deep analytics and logs search page as docs/screenshots/deep_analytics.png -->
-![Deep Analytics & Events Log](docs/screenshots/deep_analytics.png)
-
-### 💾 7. Historical Database Backups & Restoration
-Manage automated and manual database run backups, select previous run snapshots, and restore them to overlay comparative metrics on the historical analytics view.
-<!-- SCREENSHOT_PLACEHOLDER: Save a screenshot of the backup restoration controls/dashboard as docs/screenshots/backup_restoration.png -->
-![Historical Backup Restoration](docs/screenshots/backup_restoration.png)
+![Dashboard Fully Loaded](assets/screenshots/dashboard_fully_loaded.png)
+*Figure 1: The main simulation dashboard tracking citizen wealth, happiness, and GDP over a running simulation.*
 
 ---
 
-## ⚡ Architectural Highlights
+### 👑 2. Government Panel — Cabinet & Enacted Policies
 
-1. **Hybrid LLM Architecture (Ollama local inference)**:
-   - **Citizens (0.5B Model)**: Standard citizen decision loops run sequentially using `qwen2.5-coder:0.5b` to prevent CPU choking, completing decisions in ~15-30s.
-   - **Government (3B Model)**: Structural policy work runs on `qwen2.5-coder:3b` (`autosociety-qwen`) for complex multi-step reasoning.
-   
-   <!-- SCREENSHOT_PLACEHOLDER: Save your hybrid model stats/performance screenshot as docs/screenshots/hybrid_model_stats.png -->
-   ![Hybrid Model Performance Stats](docs/screenshots/hybrid_model_stats.png)
+The Government Panel displays the six active cabinet agents (Finance Minister, Police Chief, Education Minister, Health Minister, Policy Coordinator, and Governor) with their designated goals at the top. Below that is the world overview, the table of enacted policies with full descriptions and estimated effects, and a feed of recent government/world events.
 
-2. **Symmetrical Day-to-Tick Engine**:
-   - 1 Simulation Tick maps symmetrically and translates mathematically to 1 Day in the world timeline. The backend engine serves as the single authority on simulation day.
+![Government Policies Enacted](assets/screenshots/government_policies_enacted.png)
+*Figure 2: The Government Panel showing the active cabinet, enacted policies table, and recent government events.*
 
-3. **Resilient Database Backups & Restoration**:
-   - Every simulation initialization or manual reset triggers an automatic, concurrent backup of the active database (`autosociety.db`) and historical metrics database (`metrics.db`) as WAL-safe timestamped companion files in `data_storage/backups/`.
-   - Past run snapshots are dynamically merged and restored on the Historical Analytics dashboard for comparative multi-run chart overlays.
-   
-   <!-- SCREENSHOT_PLACEHOLDER: Save your database backup/restoration UI screenshot as docs/screenshots/backup_restoration.png -->
-   ![Database Backup & Restoration UI](docs/screenshots/backup_restoration.png)
+---
 
-4. **Advanced Event Analytics**:
-   - Deep Analytics page features select-box filtering by event types (Crimes, Disasters, Policies, Agent Failures, Economic) and keyword search over the logs table, processed via server-side SQLite query filters.
-   
-   <!-- SCREENSHOT_PLACEHOLDER: Save your search and filter events screenshot as docs/screenshots/deep_analytics.png -->
-   ![Advanced Event Search & Filtering](docs/screenshots/deep_analytics.png)
+### 🔍 3. Deep Analytics & Searchable Event Log
 
-5. **Environment & Test Suite Isolation**:
-   - Automated tests run against separate in-memory / temporary SQLite files (`test_autosociety.db` and `test_metrics.db`), guaranteeing that running tests never corrupts or deletes live simulation progress.
+The Deep Analytics page provides the complete chronological event feed with select-box filtering by event type (citizen_action, agent_failure, disaster, government_failure), a minimum severity slider, and keyword search. Each event is shown in an expandable card with the full reasoning text, timestamp, and severity label.
 
-6. **Windows Socket Stability**:
-   - Includes custom proactor-loop monkey-patches preventing standard library `ConnectionResetError: [WinError 10054]` crashes on Windows.
+![Deep Analytics Filtered](assets/screenshots/deep_analytics_filtered.png)
+*Figure 3: The Deep Analytics page with event type filter applied, showing expandable AI decision cards with full reasoning text.*
+
+---
+
+### 👥 4. Society Explorer — Citizen Registry
+
+The Society Explorer shows all 30 citizens in a searchable, filterable table with their current stats (happiness, wealth, health, social score). Job distribution and happiness distribution charts appear below.
+
+![Citizen Registry](docs/screenshots/citizen_registry.png)
+*Figure 4: The citizen registry with search filters and population statistics.*
+
+---
+
+### 📊 5. Deep Analytics Charts
+
+The Analytics page tracks economy (GDP, tax revenue, active businesses), crime rate, employment rate, and overall society health indicators over time via Plotly charts.
+
+![Macro Analytics](docs/screenshots/macro_analytics.png)
+*Figure 5: Economy, crime, and employment trend charts from the Analytics page.*
+
+---
+
+## 📸 Screenshot Capture Checklist
+
+Follow these steps to generate the three new screenshots. Save them to **`autosociety/assets/screenshots/`** in the project root using the filenames below.
+
+### Prerequisites
+1. Start the app: `python run_sim.py`
+2. Open http://localhost:8501 in your browser
+
+### Shot 1 — `dashboard_fully_loaded.png`
+| Step | Action |
+|---|---|
+| 1 | Click **▶️ Start** on the main dashboard |
+| 2 | Wait for at least **6-8 ticks** to pass (watch the "📅 Day" counter increase) |
+| 3 | Make sure the GDP and Average Wealth charts have visible lines (not empty) |
+| 4 | Hit **Print Screen** / **Snipping Tool** |
+| 5 | Save as `assets/screenshots/dashboard_fully_loaded.png` |
+
+### Shot 2 — `government_policies_enacted.png`
+| Step | Action |
+|---|---|
+| 1 | Let the simulation run until at least **tick 6+** (with `TICKS_PER_MONTH=3`, a government policy session fires every 3 ticks — wait for 2 cycles) |
+| 2 | Click **Government** in the Streamlit sidebar |
+| 3 | Verify the cabinet cards are visible at the top (Finance Minister, Police Chief, etc.) |
+| 4 | Verify the **Enacted Policies** table has at least 1-2 rows |
+| 5 | Hit **Print Screen** |
+| 6 | Save as `assets/screenshots/government_policies_enacted.png` |
+
+### Shot 3 — `deep_analytics_filtered.png`
+| Step | Action |
+|---|---|
+| 1 | Let the simulation run for at least **5+ ticks** so the events log is populated |
+| 2 | Click **Deep Analytics** in the Streamlit sidebar |
+| 3 | In the "Event type" select-box, choose `citizen_action` to filter |
+| 4 | Expand one or two event cards by clicking on them |
+| 5 | Hit **Print Screen** |
+| 6 | Save as `assets/screenshots/deep_analytics_filtered.png` |
+
+### Folder Setup
+If `assets/screenshots/` doesn't exist yet, create it:
+```bash
+mkdir -p assets/screenshots
+```
+The README's image tags point to `assets/screenshots/<filename>.png` — no other config needed.
 
 ---
 
